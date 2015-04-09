@@ -2,13 +2,17 @@ from subprocess import check_output
 from bottle import Bottle, request, route, run
 from scheduler import Scheduler
 import json
+import http.client
 # import servo
 
 class HungryAgent:
-
+    
     def __init__(self, agent_id, host, port):
+        self._server_url = "http://hungrycats.herokuapp.com"
         self._heartbeat_interval = 120
         self._ip = self._get_ip()
+        
+        print('ip: ' + self._ip)
         
         self._id = agent_id #TODO persist this, maybe just in a text file
         
@@ -19,44 +23,51 @@ class HungryAgent:
         self._scheduler = Scheduler()
         self._setup_routes()
         
-        self._create_checkin()
+        self._create_checkin(self._server_url)
         
     def _setup_routes(self):
         self._app.route('/', method='GET', callback=self._hello)
         self._app.route('/schedules/<id:int>', method='POST', callback=self._create_schedule)
         self._app.route('/schedules/<id:int>', method='PATCH', callback=self._edit_schedule)
         self._app.route('/schedules/<id:int>', method='DELETE', callback=self._delete_schedule)
-        self._app.route('/feed/<amount:int>', method='POST', callback=self._feed)
+        self._app.route('/feed/', method='POST', callback=self._feed)
                 
     def _hello(self):
-        return "Hungrycats agent online v0.0.1"
+        return "hungrycats agent online v0.0.1"
         
     def _create_schedule(self, id):
         
-        return 0
+        return "schedule created"
         
     def _edit_schedule(self, id):
         
-        return 0
+        return "schedule edited"
         
     def _delete_schedule(self, id):
         
-        return 0
+        return "schedule deleted"
         
-    def _feed(self, amount):
-        rotation_time = amount / 1000
+    def _feed(self):
+    #    rotation_time = amount / 1000
     #     
     #     servo.rotate(rotation_time)
-    #     return 0
+        return "cats fed"
     
     def start(self):
         self._app.run(host=self._host, port=self._port)
 
-    def _create_checkin(self):
-        ip_command   = "dig +short myip.opendns.com @resolver1.opendns.com"
-        curl_command = '''ip=$({0}); curl -H "Content-Type: application/json" -X POST -d '{{"ip":"$ip"}}' http://hungrycats.herokuapp.com/api/checkin/{1}'''
+    def _create_checkin(self, server_url):
+        ip = self._get_ip()
         
-        cmd = curl_command.format(ip_command, self._id)
+        #TODO use http.client to do this instead
+        curl_command = '''curl -H "Content-Type: application/json" -X POST -d '{{"ip":"{0}"}}' {1}/api/checkin/{2}'''
+        
+        cmd = curl_command.format(ip, server_url, self._id)
+        print('check-in command: ' + cmd)
+        
+        if self._scheduler.get_cron_job("checkin") is None:
+            self._scheduler.create_cron_job("checkin", cmd, "*/5 * * * *")
+        
         return 0
         
     def check_in(self):
